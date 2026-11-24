@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HexWard // Modding Conflict Solver & Binary Dissector</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <div class="outrun-bg" aria-hidden="true">
+    <div class="outrun-sun"></div>
+    <div class="outrun-grid"></div>
+  </div>
+
+  <main class="shell">
+    <header class="masthead">
+      <div class="brand-wrap">
+        <div class="brand-sigil">HW</div>
+        <div>
+          <h1 class="brand-title">HEXWARD ATELIER</h1>
+          <p class="brand-sub">VFS LOAD-ORDER SOLVER // 3-WAY PATCH MERGER // ELF-PE ENTROPY &amp; PBR LAB</p>
+        </div>
+      </div>
+
+      <div class="hud-metrics">
+        <div class="hud-pill"><span>Mods Loaded</span><strong id="kpi-mods">0</strong></div>
+        <div class="hud-pill"><span>VFS Collisions</span><strong id="kpi-collisions" class="warn">0</strong></div>
+        <div class="hud-pill"><span>Critical Scripts</span><strong id="kpi-critical" class="warn">0</strong></div>
+        <div class="hud-pill"><span>Topology DAG</span><strong id="kpi-topo">CLEAN</strong></div>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-mint" id="btn-autosort" type="button">Auto-Sort DAG</button>
+        <a class="btn btn-rose" href="/api/report/load-order" download="hexward-load-order.json" style="text-decoration:none;display:inline-flex;align-items:center;">Export Order</a>
+      </div>
+    </header>
+
+    <nav class="stage-tabs" role="tablist">
+      <button class="stage-tab active" data-stage="vfs" type="button">01 // VFS LOAD ORDER &amp; COLLISIONS</button>
+      <button class="stage-tab" data-stage="merge" type="button">02 // 3-WAY CONFIG PATCH MERGER</button>
+      <button class="stage-tab" data-stage="binary" type="button">03 // BINARY ENTROPY &amp; AOB LAB</button>
+      <button class="stage-tab" data-stage="texture" type="button">04 // PBR TEXTURE CHANNEL LAB</button>
+    </nav>
+
+    <!-- STAGE 1: VFS & COLLISIONS -->
+    <section class="stage-view grid-2col active" id="stage-vfs">
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Mod Priority Stack (Last Wins Overwrites)</h2>
+          <span class="mod-priority" id="topo-badge">Kahn Topological Verified</span>
+        </div>
+        <div class="mod-list" id="mod-stack-list"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Virtual File System Collision Matrix</h2>
+          <div style="display:flex;gap:6px;">
+            <button class="btn sev-filter active" data-sev="ALL" type="button">All</button>
+            <button class="btn sev-filter" data-sev="CRITICAL" type="button">Critical</button>
+            <button class="btn sev-filter" data-sev="CONFIG" type="button">Config</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Virtual Path</th>
+              <th>Winning Mod</th>
+              <th>Overridden</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="collision-tbody"></tbody>
+        </table>
+      </article>
+    </section>
+
+    <!-- STAGE 2: 3-WAY MERGER -->
+    <section class="stage-view" id="stage-merge">
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Semantic INI / JSON 3-Way Config Merger</h2>
+          <div class="merge-controls">
+            <label>Target File:
+              <select id="merge-file-select">
+                <option value="config/combat_balance.ini">config/combat_balance.ini</option>
+                <option value="config/shader_pipeline.json">config/shader_pipeline.json</option>
+              </select>
+            </label>
+            <label>Mod A (Ours):
+              <select id="merge-moda-select"></select>
+            </label>
+            <label>Mod B (Theirs):
+              <select id="merge-modb-select"></select>
+            </label>
+            <button class="btn btn-rose" id="btn-run-merge" type="button">Compute 3-Way Merge</button>
+          </div>
+        </div>
+
+        <div id="merge-summary-bar" class="mod-meta"></div>
+
+        <div class="conflict-grid" id="merge-conflicts-box"></div>
+
+        <div class="diff-quad">
+          <div class="code-pane"><header><span>VANILLA BASE</span></header><pre id="pre-base"></pre></div>
+          <div class="code-pane"><header><span id="hdr-ours">MOD A (OURS)</span></header><pre id="pre-ours"></pre></div>
+          <div class="code-pane"><header><span id="hdr-theirs">MOD B (THEIRS)</span></header><pre id="pre-theirs"></pre></div>
+          <div class="code-pane" style="border-color:var(--neon-mint)"><header><span style="color:var(--neon-mint)">PATCHED OUTPUT</span></header><pre id="pre-merged"></pre></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- STAGE 3: BINARY DISSECTOR & AOB SCANNER -->
+    <section class="stage-view grid-2col" id="stage-binary">
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">PE64 / ELF64 Section Dissector &amp; Entropy Horizon</h2>
+          <select id="binary-select"></select>
+        </div>
+        <div class="mod-meta" id="binary-header-meta"></div>
+        <canvas id="entropy-canvas" class="entropy-canvas" width="640" height="150"></canvas>
+        <table class="data-table">
+          <thead>
+            <tr><th>Section</th><th>Offset</th><th>Virt Addr</th><th>Size</th><th>Entropy</th></tr>
+          </thead>
+          <tbody id="section-tbody"></tbody>
+        </table>
+        <div class="panel-head"><h3 class="panel-title">Extracted Strings</h3></div>
+        <div id="strings-box" class="hex-rows" style="max-height:130px;"></div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Wildcard AOB Signature Scanner &amp; Hex Dumper</h2>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" id="aob-input" value="48 8B ?? ?? 89 45 FC" style="width:210px;" />
+            <button class="btn btn-rose" id="btn-aob-scan" type="button">Scan AOB</button>
+          </div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>Offset</th><th>Section</th><th>Matched Byte Window</th><th>Inspect</th></tr></thead>
+          <tbody id="aob-tbody"></tbody>
+        </table>
+        <div class="panel-head">
+          <h3 class="panel-title">Hex + ASCII Inspector</h3>
+          <span id="hex-range-label" class="mod-meta">0x000000</span>
+        </div>
+        <div id="hex-rows-box" class="hex-rows"></div>
+      </article>
+    </section>
+
+    <!-- STAGE 4: PBR TEXTURE CHANNEL LAB -->
+    <section class="stage-view" id="stage-texture">
+      <article class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">PBR Texture Channel Splitter &amp; Normal-Space Validator</h2>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <select id="texture-select"></select>
+            <button class="btn btn-mint" id="btn-inspect-tex" type="button">Analyze Channels</button>
+          </div>
+        </div>
+        <div id="texture-diag-bar" class="mod-meta"></div>
+        <div id="texture-channel-grid" class="channel-grid"></div>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

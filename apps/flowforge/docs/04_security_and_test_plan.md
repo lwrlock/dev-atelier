@@ -1,0 +1,3 @@
+# TDD & Security Plan
+
+FlowForge için 12 test ve 5 güvenlik koruması: Testler arasında pytest ile webhook node SSRF koruması, subprocess shell=False + timeout + whitelist, expression eval AST güvenliği (raw eval yerine), task stdout/XSS kaçışları ve SQLite WAL concurrency kontrolü yer alır. Güvenlik önlemleri şunlardır: Webhook girişlerinde SSRF engelleme, subprocess çağrılarında shell kapalı tutma, komut listesi whitelendingi, matematiksel ifadelerde AST parse ile güvenli değerlendirme, çıktı loglarında XSS escape ve SQLite işlemlerinde WAL modu ile veri bütünlüğü koruması. Bu yapı, FlowForge'nin güvenliğini artırır.

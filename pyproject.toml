@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dev-atelier"
+version = "0.1.0"
+description = "Unified Systems & Reverse-Engineering Workbench: FlowForge DAG, CortexScope LLM/RAPL Telemetry & HexWard Modding/Binary Lab"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "aiohttp>=3.9",
+  "numpy>=1.26",
+  "pillow>=10.0",
+  "psutil>=5.9",
+  "pydantic>=2.6",
+]
+
+[project.scripts]
+dev-atelier = "dev_atelier.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,12 @@
+[Unit]
+Description=FlowForge DAG Workflow Engine & Chaos Observatory
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/furkan/.ardupilot-venv/bin/flowforge serve --host 127.0.0.1 --port 11440 --workers 6
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

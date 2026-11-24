@@ -1,0 +1,12 @@
+[Unit]
+Description=CortexScope Ollama Proxy & Hardware Telemetry HUD
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/furkan/.ardupilot-venv/bin/cortexscope serve --host 127.0.0.1 --port 11435 --upstream http://127.0.0.1:11434
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

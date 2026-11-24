@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CortexScope — Local LLM Telemetry &amp; Hardware HUD</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div>
+        <h1>CortexScope</h1>
+        <div class="brand-sub mono">ANALOG MASTERING CONSOLE // RAPL + XE-GT :11435</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <button id="copy-proxy-btn" class="pill pill-btn mono" title="Copy OLLAMA_HOST=http://127.0.0.1:11435">
+        PROXY :11435
+      </button>
+      <span id="ws-pill" class="pill mono"><span id="ws-dot" class="dot"></span> <span id="ws-label">WS INIT</span></span>
+      <span id="upstream-pill" class="pill mono"><span id="upstream-dot" class="dot"></span> <span id="upstream-label">OLLAMA</span></span>
+      <button id="theme-btn" class="pill pill-btn mono" title="Toggle Charcoal/Paper Theme">THEME</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <!-- Radial VU Metering Deck -->
+    <section class="meter-deck" aria-label="Live Hardware Metering">
+      <div class="dial-card">
+        <div class="dial-meta">
+          <div class="kpi-label">Package Power</div>
+          <div id="kpi-pkg-w" class="kpi-value mono">— W</div>
+          <div id="kpi-psys-w" class="kpi-sub mono">Psys: — W</div>
+        </div>
+        <svg class="vu-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <circle class="vu-bg" cx="30" cy="30" r="24"/>
+          <circle id="arc-pkg-w" class="vu-arc" cx="30" cy="30" r="24" stroke="#34D399" stroke-dasharray="150.8" stroke-dashoffset="120"/>
+        </svg>
+      </div>
+      <div class="dial-card">
+        <div class="dial-meta">
+          <div class="kpi-label">Package Temp</div>
+          <div id="kpi-temp" class="kpi-value mono">— °C</div>
+          <div id="kpi-cpu" class="kpi-sub mono">CPU: —% / — MHz</div>
+        </div>
+        <svg class="vu-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <circle class="vu-bg" cx="30" cy="30" r="24"/>
+          <circle id="arc-temp" class="vu-arc" cx="30" cy="30" r="24" stroke="#EAB308" stroke-dasharray="150.8" stroke-dashoffset="90"/>
+        </svg>
+      </div>
+      <div class="dial-card">
+        <div class="dial-meta">
+          <div class="kpi-label">Intel xe GT</div>
+          <div id="kpi-gt0" class="kpi-value mono">— MHz</div>
+          <div id="kpi-gt1" class="kpi-sub mono">GT1: — MHz // Throttle: —</div>
+        </div>
+        <svg class="vu-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <circle class="vu-bg" cx="30" cy="30" r="24"/>
+          <circle id="arc-gt0" class="vu-arc" cx="30" cy="30" r="24" stroke="#FB7185" stroke-dasharray="150.8" stroke-dashoffset="150"/>
+        </svg>
+      </div>
+      <div class="dial-card">
+        <div class="dial-meta">
+          <div class="kpi-label">System RAM</div>
+          <div id="kpi-ram" class="kpi-value mono">— GiB</div>
+          <div id="kpi-swap" class="kpi-sub mono">Swap: — GiB</div>
+        </div>
+        <svg class="vu-svg" viewBox="0 0 60 60" aria-hidden="true">
+          <circle class="vu-bg" cx="30" cy="30" r="24"/>
+          <circle id="arc-ram" class="vu-arc" cx="30" cy="30" r="24" stroke="#34D399" stroke-dasharray="150.8" stroke-dashoffset="95"/>
+        </svg>
+      </div>
+      <div class="dial-card">
+        <div class="dial-meta">
+          <div class="kpi-label">Stream &amp; VRAM</div>
+          <div id="kpi-live-tps" class="kpi-value mono">0.0 tok/s</div>
+          <div id="kpi-live-ttft" class="kpi-sub mono">TTFT: —</div>
+        </div>
+        <div style="text-align:right;">
+          <div id="kpi-vram" class="mono" style="font-size:15px;font-weight:700;color:var(--amber);">0 MiB</div>
+          <div id="kpi-loaded-count" class="kpi-sub mono">0 models</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 1: LIVE PULSE -->
+    <section id="view-pulse" class="view active">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">1Hz Power, Thermal &amp; CPU Telemetry (90s Rolling)</span>
+            <span class="mono muted" id="pulse-legend">Mint: Pkg W | Brass: °C | Green: CPU %</span>
+          </div>
+          <div class="panel-body">
+            <div class="canvas-wrap tall">
+              <canvas id="hw-strip-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Resident Models (/api/ps)</span>
+            <button id="refresh-ps-btn" class="btn">Refresh</button>
+          </div>
+          <div class="panel-body" id="loaded-models-box">
+            <div class="muted">No models currently loaded in Ollama memory.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Live Token Proxy Stream</span>
+            <span class="mono muted" id="live-stream-meta">Idle — route any Ollama client to :11435 or run Workbench</span>
+          </div>
+          <div class="panel-body">
+            <div id="live-stream-box" class="stream-box">Waiting for inference stream...</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Quick Latency Probe &amp; Recent Captures</span>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <select id="quick-probe-model" style="width:170px;padding:4px 6px;"></select>
+              <button id="quick-probe-btn" class="btn btn-primary">Run Probe</button>
+            </div>
+          </div>
+          <div class="panel-body table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Model</th>
+                  <th>Src</th>
+                  <th class="num">TPS</th>
+                  <th class="num">TTFT</th>
+                  <th class="num">J/100t</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="pulse-recent-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: TOKEN LATENCY HEATMAP -->
+    <section id="view-heatmap" class="view">
+      <div class="panel" style="margin-bottom:12px;">
+        <div class="panel-head">
+          <span class="panel-title">Token Inter-Token Latency (ITL) Heatmap &amp; Hesitation Lab</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <select id="hm-run-select" style="width:290px;padding:4px 8px;"></select>
+            <select id="hm-phase-filter" style="width:120px;padding:4px 8px;">
+              <option value="all">All Phases</option>
+              <option value="think">Think Only</option>
+              <option value="answer">Answer Only</option>
+            </select>
+            <button id="hm-export-csv" class="btn">CSV</button>
+            <button id="hm-export-json" class="btn">JSON</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="hm-summary-bar" class="toolbar mono"></div>
+          <div class="canvas-wrap" style="margin-bottom:12px;">
+            <canvas id="token-timeline-canvas"></canvas>
+          </div>
+          <div id="hm-peaks-bar" class="toolbar"></div>
+          <div class="grid-2" style="margin-bottom:0;">
+            <div>
+              <div class="kpi-label" style="margin-bottom:6px;">Token Heat Strip (Click any token to inspect micro-timing &amp; RAPL state)</div>
+              <div id="hm-tokens" class="heatmap-grid">Select a run to inspect token latencies.</div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><span class="panel-title">Selected Token Inspector</span></div>
+              <div class="panel-body" id="hm-token-inspector">
+                <div class="muted">Click any token chip on the left or a hesitation peak above.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: A/B MODEL ARENA -->
+    <section id="view-arena" class="view">
+      <div class="panel" style="margin-bottom:12px;">
+        <div class="panel-head">
+          <span class="panel-title">Sequential Non-Contended A/B Model Arena</span>
+          <span id="arena-status" class="mono muted">Select 2–4 models; executed sequentially for clean RAPL &amp; TPS telemetry</span>
+        </div>
+        <div class="panel-body">
+          <div class="toolbar">
+            <button class="btn arena-preset" data-preset="reasoning">Preset: Reasoning Trap</button>
+            <button class="btn arena-preset" data-preset="code">Preset: Python Systems</button>
+            <button class="btn arena-preset" data-preset="linux">Preset: Linux Kernel Debug</button>
+            <button class="btn arena-preset" data-preset="tr">Preset: Türkçe Teknik Özet</button>
+          </div>
+          <div class="field" style="margin-bottom:10px;">
+            <label><span>Arena Prompt</span><span id="arena-prompt-est" class="mono">0 tok</span></label>
+            <textarea id="arena-prompt" rows="3" placeholder="Enter an identical benchmark prompt to compare models cleanly..."></textarea>
+          </div>
+          <div class="toolbar" style="justify-content:space-between;">
+            <div id="arena-model-checks" class="model-chips"></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <label class="mono" style="font-size:11px;">Temp <input id="arena-temp" type="number" step="0.1" min="0" max="2" value="0.2" class="input" style="width:65px;display:inline-block;" /></label>
+              <label class="mono" style="font-size:11px;">MaxTok <input id="arena-maxtok" type="number" step="64" min="32" max="2048" value="256" class="input" style="width:78px;display:inline-block;" /></label>
+              <label class="model-check"><input id="arena-think" type="checkbox" /><span>Think</span></label>
+              <button id="arena-run-btn" class="btn btn-primary">Launch Arena Match</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="arena-results-area"></div>
+
+      <div class="panel" style="margin-top:12px;">
+        <div class="panel-head"><span class="panel-title">Saved Arena Matches</span></div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead><tr><th>Match</th><th>Models</th><th>Winner</th><th>Prompt</th><th>Notes</th></tr></thead>
+            <tbody id="arena-history-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 4: MODELFILE & CONTEXT WORKBENCH -->
+    <section id="view-workbench" class="view">
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Prompt &amp; Sampling Workbench</span>
+            <select id="wb-model" style="width:240px;padding:4px 8px;"></select>
+          </div>
+          <div class="panel-body">
+            <div class="field" style="margin-bottom:10px;">
+              <label><span>System Prompt</span><span id="wb-caps" class="mono">capabilities: —</span></label>
+              <textarea id="wb-system" rows="2" placeholder="Optional system override..."></textarea>
+            </div>
+            <div class="field" style="margin-bottom:10px;">
+              <label><span>User Prompt</span><span id="wb-budget-label" class="mono">0 / 4096 tok (0%)</span></label>
+              <textarea id="wb-prompt" rows="4" placeholder="Write prompt to profile token-by-token through CortexScope..."></textarea>
+              <div class="vram-bar"><div id="wb-budget-bar" class="vram-fill" style="width:0%"></div></div>
+            </div>
+            <div class="form-grid" style="margin-bottom:12px;">
+              <div class="field">
+                <label><span>Temperature</span><span id="wb-temp-val" class="mono">0.2</span></label>
+                <input id="wb-temp" type="range" min="0" max="1.5" step="0.05" value="0.2" />
+              </div>
+              <div class="field">
+                <label><span>Top P</span><span id="wb-topp-val" class="mono">0.9</span></label>
+                <input id="wb-topp" type="range" min="0.1" max="1.0" step="0.05" value="0.9" />
+              </div>
+              <div class="field">
+                <label><span>num_ctx</span><span id="wb-ctx-val" class="mono">4096</span></label>
+                <input id="wb-ctx" type="range" min="512" max="32768" step="512" value="4096" />
+              </div>
+              <div class="field">
+                <label><span>num_predict</span><span id="wb-pred-val" class="mono">384</span></label>
+                <input id="wb-pred" type="range" min="32" max="2048" step="32" value="384" />
+              </div>
+            </div>
+            <div class="toolbar" style="justify-content:space-between;margin-bottom:8px;">
+              <label class="model-check"><input id="wb-think" type="checkbox" /><span>Enable Thinking Stream</span></label>
+              <div style="display:flex;gap:8px;">
+                <button id="wb-open-hm" class="btn" disabled>Open Last in Heatmap</button>
+                <button id="wb-run-btn" class="btn btn-primary">Execute &amp; Profile</button>
+              </div>
+            </div>
+            <div id="wb-output" class="stream-box">Run output and timing telemetry will appear here...</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Live Modelfile &amp; Template Inspector (/api/show)</span>
+            <span id="wb-arch-badge" class="badge badge-cyan">—</span>
+          </div>
+          <div class="panel-body">
+            <div class="kpi-label" style="margin-bottom:4px;">Parameters</div>
+            <pre id="wb-params" class="pre-code" style="margin-bottom:10px;">—</pre>
+            <div class="kpi-label" style="margin-bottom:4px;">Modelfile</div>
+            <pre id="wb-modelfile" class="pre-code" style="margin-bottom:10px;">—</pre>
+            <div class="kpi-label" style="margin-bottom:4px;">Prompt Template</div>
+            <pre id="wb-template" class="pre-code">—</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: HISTORY & QUANTILE EXPLORER -->
+    <section id="view-history" class="view">
+      <div class="grid-equal">
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Global ITL Latency Distribution</span></div>
+          <div class="panel-body"><div class="canvas-wrap"><canvas id="itl-hist-canvas"></canvas></div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><span class="panel-title">Throughput (TPS) vs Peak Temp (°C)</span></div>
+          <div class="panel-body"><div class="canvas-wrap"><canvas id="scatter-canvas"></canvas></div></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:12px;">
+        <div class="panel-head"><span class="panel-title">Per-Model Efficiency Leaderboard</span></div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th class="num">Runs</th>
+                <th class="num">Tokens</th>
+                <th class="num">Avg TPS</th>
+                <th class="num">Max TPS</th>
+                <th class="num">Avg TTFT</th>
+                <th class="num">Avg P95 ITL</th>
+                <th class="num">Avg J/100t</th>
+                <th class="num">Max °C</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">Captured Run History (SQLite WAL)</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <input id="hist-search" class="input" placeholder="Filter prompt or model..." style="width:190px;padding:4px 8px;" />
+            <select id="hist-source" style="width:120px;padding:4px 8px;">
+              <option value="">All Sources</option>
+              <option value="proxy">proxy</option>
+              <option value="workbench">workbench</option>
+              <option value="arena">arena</option>
+            </select>
+            <button id="hist-refresh-btn" class="btn">Reload</button>
+          </div>
+        </div>
+        <div class="panel-body table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Model</th>
+                <th>Source</th>
+                <th>Prompt</th>
+                <th class="num">Tok (T/A)</th>
+                <th class="num">TPS</th>
+                <th class="num">TTFT</th>
+                <th class="num">P95 ITL</th>
+                <th class="num">J/100t</th>
+                <th class="num">°C</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="dock-wrap">
+    <nav class="nav-tabs" role="tablist" aria-label="CortexScope Mastering Dock">
+      <button class="tab-btn active" data-tab="pulse" role="tab" aria-selected="true"><span class="kbd">1</span> Live Scope</button>
+      <button class="tab-btn" data-tab="heatmap" role="tab" aria-selected="false"><span class="kbd">2</span> Token Heatmap</button>
+      <button class="tab-btn" data-tab="arena" role="tab" aria-selected="false"><span class="kbd">3</span> A/B Arena</button>
+      <button class="tab-btn" data-tab="workbench" role="tab" aria-selected="false"><span class="kbd">4</span> Modelfile Lab</button>
+      <button class="tab-btn" data-tab="history" role="tab" aria-selected="false"><span class="kbd">5</span> Quantiles</button>
+    </nav>
+  </div>
+
+  <div id="toast" class="toast mono" role="status" aria-live="polite"></div>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

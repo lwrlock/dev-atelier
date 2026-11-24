@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hexward"
+version = "0.1.0"
+description = "Game Modding Conflict Solver, 3-Way Config Patch Merger, ELF/PE Binary Dissector & PBR Texture Inspector"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "numpy>=1.26",
+  "pillow>=10.0",
+  "pydantic>=2.6",
+]
+
+[project.scripts]
+hexward = "hexward.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

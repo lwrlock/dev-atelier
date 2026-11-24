@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlowForge — DAG Orchestrator &amp; Chaos Observatory</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- LEFT NAVIGATION RAIL -->
+    <aside class="sidebar-rail" aria-label="Primary Navigation">
+      <div class="rail-brand">
+        <div class="brand-left">
+          <div class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/>
+              <path d="M7.5 12h4l5-6M11.5 12l5 6"/>
+            </svg>
+          </div>
+          <div>
+            <div class="brand-name">FlowForge</div>
+            <div class="brand-ver mono">v0.1.0 // DAG OS</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="nav-group-label">Orchestration</div>
+        <div class="rail-nav" role="tablist">
+          <button class="rail-btn active" data-tab="studio" role="tab" aria-selected="true">
+            <span class="rail-btn-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><path d="M10 6.5h4a3 3 0 0 1 3 3V14"/></svg>
+              DAG Studio
+            </span>
+            <span class="kbd">1</span>
+          </button>
+          <button class="rail-btn" data-tab="timeline" role="tab" aria-selected="false">
+            <span class="rail-btn-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+              Time-Travel
+            </span>
+            <span id="nav-runs-count" class="nav-pill-count">0</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="nav-group-label">Resilience</div>
+        <div class="rail-nav" role="tablist">
+          <button class="rail-btn" data-tab="chaos" role="tab" aria-selected="false">
+            <span class="rail-btn-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              Chaos &amp; Sagas
+            </span>
+            <span id="nav-dlq-count" class="nav-pill-count">0</span>
+          </button>
+          <button class="rail-btn" data-tab="fleet" role="tab" aria-selected="false">
+            <span class="rail-btn-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="6" rx="1.5"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>
+              Fleet &amp; Burst
+            </span>
+            <span class="kbd">4</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="nav-group-label">Automation</div>
+        <div class="rail-nav" role="tablist">
+          <button class="rail-btn" data-tab="events" role="tab" aria-selected="false">
+            <span class="rail-btn-inner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Events &amp; Cron
+            </span>
+            <span class="kbd">5</span>
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 4px 0;">
+        <span class="nav-group-label" style="padding:0;">Workflows</span>
+        <button id="new-wf-btn" class="btn" style="padding:2px 8px;font-size:11px;">+ New</button>
+      </div>
+      <div id="wf-list" class="rail-workflows"></div>
+
+      <div class="rail-footer mono">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
+          <span>Engine Store</span><span>SQLite WAL</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- RIGHT WORKSPACE COLUMN -->
+    <div class="main-column">
+      <header class="topbar">
+        <div class="breadcrumbs mono">
+          <span>FlowForge</span>
+          <span style="color:var(--text-dim)">/</span>
+          <strong id="crumb-view">DAG Studio</strong>
+          <span style="color:var(--text-dim)">/</span>
+          <span id="crumb-wf" style="color:var(--cyan)">—</span>
+        </div>
+
+        <button id="cmd-open-btn" class="cmd-trigger">
+          <span>Quick switch workflow, view, or chaos action...</span>
+          <span class="kbd">Ctrl+K</span>
+        </button>
+
+        <div class="top-actions">
+          <button id="chaos-pill" class="pill pill-btn mono" data-jump="chaos">
+            <span id="chaos-dot" class="dot"></span>
+            <span id="chaos-label">CHAOS OFF</span>
+          </button>
+          <span id="ws-pill" class="pill mono">
+            <span id="ws-dot" class="dot"></span>
+            <span id="ws-label">WS INIT</span>
+          </span>
+          <button id="theme-btn" class="pill pill-btn mono" title="Toggle Dark/Light Mode">THEME</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <!-- GROUPED 4-CARD BENTO METRICS -->
+        <section class="bento-kpis" aria-label="Cluster Summary">
+          <div class="bento-card">
+            <div class="bento-head">
+              <span>Worker Fleet</span>
+              <div id="kpi-led-strip" class="led-strip" aria-hidden="true"></div>
+            </div>
+            <div class="bento-val-row">
+              <div id="kpi-workers" class="bento-val mono">0 / 6</div>
+              <div id="kpi-tasks" class="bento-sub mono">0 tasks done</div>
+            </div>
+            <div id="kpi-crashes" class="bento-sub mono">0 crashed leases recovered</div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-head">
+              <span>Latency &amp; Reliability</span>
+              <span id="kpi-success-badge" class="badge badge-ok">—%</span>
+            </div>
+            <div class="bento-val-row">
+              <div id="kpi-latency" class="bento-val mono">— ms</div>
+              <div id="kpi-runs" class="bento-sub mono">0 runs</div>
+            </div>
+            <div class="progress-track"><div id="kpi-success-bar" class="progress-fill" style="width:0%"></div></div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-head">
+              <span>Critical Path (CPM)</span>
+              <span class="badge badge-warn">BOTTLENECK</span>
+            </div>
+            <div class="bento-val-row">
+              <div id="kpi-makespan" class="bento-val mono">— ms</div>
+              <div id="kpi-critpath" class="bento-sub mono">0 steps</div>
+            </div>
+            <div id="kpi-sagas" class="bento-sub mono">0 Saga rollbacks triggered</div>
+          </div>
+
+          <div class="bento-card">
+            <div class="bento-head">
+              <span>Dead-Letter Queue</span>
+              <span id="kpi-dlq-badge" class="badge badge-cyan">DLQ</span>
+            </div>
+            <div class="bento-val-row">
+              <div id="kpi-dlq" class="bento-val mono">0</div>
+              <div class="bento-sub mono">unresolved</div>
+            </div>
+            <div class="bento-sub mono">Event-sourced WAL replayable</div>
+          </div>
+        </section>
+
+        <!-- VIEW 1: DAG STUDIO -->
+        <section id="view-studio" class="view active">
+          <div class="studio-split">
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-title" id="studio-wf-title">Topology Canvas</span>
+                <span id="studio-run-badge" class="badge badge-cyan mono">Ready</span>
+              </div>
+              <div class="dag-stage" id="dag-stage">
+                <svg id="dag-svg" class="dag-svg" viewBox="0 0 1050 480">
+                  <defs>
+                    <filter id="node-shadow" x="-10%" y="-10%" width="120%" height="130%">
+                      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#000000" flood-opacity="0.45"/>
+                    </filter>
+                    <marker id="arrow-default" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 1 L 10 5 L 0 9 z" fill="#475569"></path>
+                    </marker>
+                    <marker id="arrow-crit" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 1 L 10 5 L 0 9 z" fill="#f59e0b"></path>
+                    </marker>
+                    <marker id="arrow-active" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                      <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"></path>
+                    </marker>
+                  </defs>
+                  <g id="dag-viewport">
+                    <g id="dag-edges-layer"></g>
+                    <g id="dag-nodes-layer"></g>
+                  </g>
+                </svg>
+
+                <div class="glass-toolbar">
+                  <button id="toggle-cpm-btn" class="btn btn-amber" style="padding:4px 9px;font-size:11px;">CPM: ON</button>
+                  <button id="fit-dag-btn" class="btn" style="padding:4px 9px;font-size:11px;">Auto Layout</button>
+                  <button id="zoom-out-btn" class="btn" style="padding:4px 8px;font-size:11px;">−</button>
+                  <button id="zoom-in-btn" class="btn" style="padding:4px 8px;font-size:11px;">+</button>
+                </div>
+
+                <div class="glass-bottom-left mono">
+                  <span class="pill">Drag nodes · Scroll zoom · Amber = Critical Path</span>
+                </div>
+
+                <div class="glass-bottom-right">
+                  <button id="run-saga-demo-btn" class="btn btn-danger" title="Inject fault & trigger reverse Saga rollback">⚡ Saga Demo</button>
+                  <button id="run-wf-btn" class="btn btn-primary">▶ Execute Workflow</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- RIGHT TABBED NODE INSPECTOR -->
+            <aside class="panel">
+              <div class="panel-head">
+                <div class="seg-tabs" role="tablist">
+                  <button class="seg-btn active" data-insp="cpm">CPM &amp; Spec</button>
+                  <button class="seg-btn" data-insp="logs">Output</button>
+                  <button class="seg-btn" data-insp="edit">Build Node</button>
+                </div>
+                <button id="save-wf-btn" class="btn" style="padding:4px 9px;font-size:11px;">Save</button>
+              </div>
+              <div class="panel-body">
+                <div id="insp-pane-cpm"></div>
+                <div id="insp-pane-logs" style="display:none;"></div>
+                <div id="insp-pane-edit" style="display:none;">
+                  <div class="bento-head" style="margin-bottom:8px;">Edit Selected Node</div>
+                  <div id="edit-node-fields" style="margin-bottom:14px;"></div>
+                  <div style="border-top:1px solid var(--border);padding-top:12px;">
+                    <div class="bento-head" style="margin-bottom:8px;">Append Task to DAG</div>
+                    <input id="add-node-id" class="input mono" placeholder="node_id (e.g. risk_audit)" style="margin-bottom:6px;" />
+                    <input id="add-node-parent" class="input mono" placeholder="parent node_id (optional)" style="margin-bottom:6px;" />
+                    <div style="display:flex;gap:6px;">
+                      <input id="add-node-ms" type="number" class="input mono" value="75" min="10" max="5000" />
+                      <button id="add-node-btn" class="btn btn-primary">Add Node</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+
+          <!-- RECENT EXECUTIONS WITH SEGMENTED FILTER -->
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-title">Recent Executions (Click any row to open Time-Travel &amp; Flamegraph)</span>
+              <div class="seg-tabs" id="runs-filter-tabs">
+                <button class="seg-btn active" data-rfilter="all">All</button>
+                <button class="seg-btn" data-rfilter="COMPLETED">Completed</button>
+                <button class="seg-btn" data-rfilter="COMPENSATED">Saga Rollbacks</button>
+              </div>
+            </div>
+            <div class="panel-body table-wrap">
+              <table>
+                <thead><tr><th>Run ID</th><th>Workflow</th><th>Trigger</th><th>Status</th><th>Saga</th><th class="num">Duration</th></tr></thead>
+                <tbody id="studio-runs-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: TIME-TRAVEL & FLAMEGRAPH -->
+        <section id="view-timeline" class="view">
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="panel-head">
+              <span class="panel-title">Deterministic Event-Sourced Time-Travel Replay</span>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <select id="tl-run-select" style="width:280px;padding:5px 8px;"></select>
+                <button id="tl-speed-btn" class="btn mono" style="padding:5px 9px;">1x</button>
+                <button id="tl-play-btn" class="btn btn-primary">▶ Play</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="transport-deck mono">
+                <div class="transport-row">
+                  <button id="tl-start-btn" class="btn" style="padding:4px 8px;">|&lt;</button>
+                  <button id="tl-prev-btn" class="btn" style="padding:4px 8px;">&lt;</button>
+                  <input id="tl-slider" type="range" min="0" max="0" value="0" />
+                  <button id="tl-next-btn" class="btn" style="padding:4px 8px;">&gt;</button>
+                  <button id="tl-end-btn" class="btn" style="padding:4px 8px;">&gt;|</button>
+                  <span id="tl-seq-label" style="min-width:170px;text-align:right;">seq 0 / 0</span>
+                </div>
+                <div id="tl-dots-rail" class="event-dots-rail"></div>
+              </div>
+
+              <div class="grid-2">
+                <div class="panel">
+                  <div class="panel-head">
+                    <span class="panel-title">Reconstructed DAG Snapshot</span>
+                    <span id="tl-event-badge" class="badge badge-cyan">—</span>
+                  </div>
+                  <div class="dag-stage compact">
+                    <svg id="tl-mini-svg" class="dag-svg" viewBox="0 0 1050 480"></svg>
+                  </div>
+                </div>
+                <div class="panel">
+                  <div class="panel-head"><span class="panel-title">Transition &amp; Active Worker Lanes</span></div>
+                  <div class="panel-body" id="tl-snapshot-box">
+                    <div class="muted">Scrub timeline to inspect state transitions.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="panel" style="margin-bottom:12px;">
+                <div class="panel-head">
+                  <span class="panel-title">Worker-Lane Gantt Waterfall</span>
+                  <span class="mono muted" style="font-size:11px;">Slate: Queue Wait · Green: Completed · Red: Fault · Orange: Saga Rollback</span>
+                </div>
+                <div class="panel-body"><div class="canvas-wrap tall"><canvas id="flamegraph-canvas"></canvas></div></div>
+              </div>
+
+              <div class="panel">
+                <div class="panel-head"><span class="panel-title">Task Attempt Logs</span></div>
+                <div class="panel-body table-wrap">
+                  <table>
+                    <thead><tr><th>Node</th><th>Attempt</th><th>Phase</th><th>Worker</th><th>Status</th><th class="num">Duration</th><th>Chaos</th><th>Stdout / Error</th></tr></thead>
+                    <tbody id="tl-attempts-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: CHAOS & SAGA LAB -->
+        <section id="view-chaos" class="view">
+          <div class="grid-3">
+            <div class="scenario-card">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong>Network Latency Brownout</strong>
+                  <span class="badge badge-warn">JITTER</span>
+                </div>
+                <div class="muted" style="font-size:12px;">Injects +350ms latency and 25% transient error probability across all task nodes.</div>
+              </div>
+              <button class="btn btn-amber chaos-preset" data-preset="brownout">Arm Brownout</button>
+            </div>
+            <div class="scenario-card">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong>Worker Crash Storm</strong>
+                  <span class="badge badge-cyan">LEASE HEAL</span>
+                </div>
+                <div class="muted" style="font-size:12px;">Simulates mid-flight worker death once per node so lease recovery re-queues tasks cleanly.</div>
+              </div>
+              <button class="btn chaos-preset" data-preset="crash">Arm Worker Crash</button>
+            </div>
+            <div class="scenario-card">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong>Payment Gateway Outage</strong>
+                  <span class="badge badge-err">SAGA TEST</span>
+                </div>
+                <div class="muted" style="font-size:12px;">100% fault on <code class="mono">charge</code> to trip retries, open DLQ, and run reverse Saga refund/release.</div>
+              </div>
+              <button class="btn btn-danger chaos-preset" data-preset="saga">Arm Payment Fault</button>
+            </div>
+          </div>
+
+          <div class="grid-equal">
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-title">Custom Chaos Rule Builder</span>
+                <button id="chaos-clear-btn" class="btn">Clear All Faults</button>
+              </div>
+              <div class="panel-body">
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px;">
+                  <div><label class="bento-head">Node (* = all)</label><input id="chaos-node" class="input mono" value="*" /></div>
+                  <div><label class="bento-head">Latency (ms)</label><input id="chaos-lat" type="number" class="input mono" value="250" min="0" max="5000" /></div>
+                  <div><label class="bento-head">Fail Prob</label><input id="chaos-prob" type="number" step="0.1" class="input mono" value="0.5" min="0" max="1" /></div>
+                  <button id="chaos-add-btn" class="btn btn-primary">Apply</button>
+                </div>
+                <label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:10px;cursor:pointer;">
+                  <input id="chaos-crash-once" type="checkbox" />
+                  <span class="mono" style="font-size:11px;">Crash Assigned Worker Mid-Flight Once</span>
+                </label>
+                <pre id="chaos-rules-pre" class="pre-code">[]</pre>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-title">Dependency Circuit Breakers</span>
+                <button id="reset-breakers-btn" class="btn">Reset CLOSED</button>
+              </div>
+              <div class="panel-body" id="breakers-box"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-title">Dead-Letter Queue (DLQ) &amp; Replay</span>
+              <button id="refresh-dlq-btn" class="btn">Refresh</button>
+            </div>
+            <div class="panel-body table-wrap">
+              <table>
+                <thead><tr><th>ID</th><th>Run</th><th>Workflow</th><th>Node</th><th>Attempts</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="dlq-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: FLEET & BURST BENCHMARK -->
+        <section id="view-fleet" class="view">
+          <div class="panel" style="margin-bottom:12px;">
+            <div class="panel-head">
+              <span class="panel-title">Async Worker Fleet &amp; Burst Load Cockpit</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <select id="burst-wf" style="width:220px;padding:4px 8px;"></select>
+                <input id="burst-count" type="number" class="input mono" value="15" min="2" max="50" style="width:68px;padding:4px 6px;" />
+                <button id="burst-run-btn" class="btn btn-primary">Launch Burst</button>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div id="burst-result-bar" class="mono muted" style="margin-bottom:12px;">Fire concurrent workflows to measure real runs/s throughput and tail P95 latency.</div>
+              <div id="worker-grid" class="worker-grid"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><span class="panel-title">Execution Latency &amp; Outcome Distribution</span></div>
+            <div class="panel-body"><div class="canvas-wrap tall"><canvas id="throughput-canvas"></canvas></div></div>
+          </div>
+        </section>
+
+        <!-- VIEW 5: EVENTS, CRON & EXPORT -->
+        <section id="view-events" class="view">
+          <div class="grid-2">
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-title">Cron Scheduler</span>
+                <button id="refresh-cron-btn" class="btn">Refresh</button>
+              </div>
+              <div class="panel-body">
+                <div style="display:grid;grid-template-columns:1.2fr 1fr auto;gap:8px;margin-bottom:10px;">
+                  <select id="cron-wf"></select>
+                  <input id="cron-expr" class="input mono" value="*/5 * * * *" />
+                  <button id="cron-add-btn" class="btn btn-primary">Schedule</button>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>ID</th><th>Workflow</th><th>Cron</th><th>Next Fire (UTC)</th><th>Action</th></tr></thead>
+                    <tbody id="cron-body"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-head">
+                <span class="panel-title">Mermaid DAG &amp; Idempotent Webhook</span>
+                <button id="copy-mermaid-btn" class="btn">Copy Mermaid</button>
+              </div>
+              <div class="panel-body">
+                <pre id="mermaid-pre" class="pre-code" style="margin-bottom:8px;"></pre>
+                <pre id="webhook-pre" class="pre-code"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <span class="panel-title">Append-Only Event Store Ledger (run_events)</span>
+              <button id="refresh-events-btn" class="btn">Reload</button>
+            </div>
+            <div class="panel-body table-wrap">
+              <table>
+                <thead><tr><th>Run</th><th>Seq</th><th>Node</th><th>Event</th><th>Transition</th><th>Worker</th><th>Detail</th></tr></thead>
+                <tbody id="events-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- COMMAND PALETTE MODAL -->
+  <div id="cmd-backdrop" class="cmd-backdrop" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <div class="cmd-modal">
+      <input id="cmd-input" class="cmd-input mono" placeholder="Jump to view, workflow, or action (Saga, Burst, Theme)..." />
+      <div id="cmd-list" class="cmd-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast mono" role="status" aria-live="polite"></div>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

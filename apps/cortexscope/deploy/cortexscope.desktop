@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CortexScope HUD
+Comment=Local LLM Telemetry, ITL Heatmap & RAPL Energy Profiler
+Exec=/home/furkan/.ardupilot-venv/bin/cortexscope serve --open
+Terminal=false
+Categories=Development;System;Monitor;
+StartupNotify=true

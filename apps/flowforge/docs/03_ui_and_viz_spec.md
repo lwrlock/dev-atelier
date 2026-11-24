@@ -1,0 +1,3 @@
+# Observatory UI Architecture
+
+FlowForge UI tasarımı için şunlar: 1) Obsidian zemin üzerinde cyan çizgilerle dinamik SVG DAG editörü; kritik yol otomatik hesaplanır ve animasyonlu nabız gösterir. 2) Emerald tonlarında Gantt-flame grafik; zaman seyahat scrubberi ile geçmiş geleceğe anlık geçiş sağlar. 3) Amber uyarılarla Chaos Lab; devre kesicileri ve DLQ yönetimi gerçek zamanlıdır. 4) Worker fleet benchmarki; ani yük patlamalarını (burst) simüle eder ve performansını ölçer. 5) Crimson vurgulu Event Store; cron görevleri ve dışa aktarma seçeneklerini merkezi bir panoda sunar. Tüm arayüz, minimal dot grid ile modern ve odaklıdır
